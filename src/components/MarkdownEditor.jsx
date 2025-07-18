@@ -11,7 +11,7 @@ const MarkdownEditor = ({ value, onChange }) => {
         <h3>Editor</h3>
       </div>
       <Editor
-        height="calc(100vh - 60px)"
+        height="calc(100vh - 49px)"
         defaultLanguage="markdown"
         value={value}
         onChange={handleEditorChange}
@@ -23,7 +23,11 @@ const MarkdownEditor = ({ value, onChange }) => {
           wordWrap: 'on',
           automaticLayout: true,
           scrollBeyondLastLine: false,
-          padding: { top: 16, bottom: 16 }
+          padding: { top: 16, bottom: 16 },
+          scrollbar: {
+            vertical: 'auto',
+            horizontal: 'auto'
+          }
         }}
       />
     </div>
