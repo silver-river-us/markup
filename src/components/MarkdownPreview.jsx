@@ -40,14 +40,30 @@ const MarkdownPreview = ({ markdown }) => {
         const mermaidCode = element.textContent;
         
         try {
-          const { svg } = await mermaid.render(`mermaid-${i}`, mermaidCode);
+          const { svg } = await mermaid.render(`mermaid-${Date.now()}-${i}`, mermaidCode);
           const wrapper = document.createElement('div');
           wrapper.className = 'mermaid-diagram';
           wrapper.innerHTML = svg;
-          element.parentNode.replaceChild(wrapper, element.parentNode);
+          
+          // Replace the entire pre element, not just the code element
+          const preElement = element.closest('pre');
+          if (preElement) {
+            preElement.parentNode.replaceChild(wrapper, preElement);
+          } else {
+            element.parentNode.replaceChild(wrapper, element);
+          }
         } catch (error) {
           console.error('Mermaid rendering error:', error);
-          element.parentNode.innerHTML = `<div class="mermaid-error">Error rendering diagram: ${error.message}</div>`;
+          const errorDiv = document.createElement('div');
+          errorDiv.className = 'mermaid-error';
+          errorDiv.textContent = `Error rendering diagram: ${error.message}`;
+          
+          const preElement = element.closest('pre');
+          if (preElement) {
+            preElement.parentNode.replaceChild(errorDiv, preElement);
+          } else {
+            element.parentNode.replaceChild(errorDiv, element);
+          }
         }
       }
     };
