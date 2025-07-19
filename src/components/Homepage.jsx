@@ -47,7 +47,7 @@ const Homepage = ({ onSelectMode, onContinue }) => {
   return (
     <div className="homepage">
       <div className="homepage-content">
-        <h1 className="homepage-title">MarkUp</h1>
+        <h1 className="homepage-title underline">MarkUp</h1>
         <p className="homepage-subtitle">Choose your editing mode</p>
         
         {savedState?.canContinue && (
