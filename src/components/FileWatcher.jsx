@@ -12,6 +12,7 @@ const FileWatcher = ({ onBack, isRestoring }) => {
   const [isWatching, setIsWatching] = useState(false);
   const [accessibleFiles, setAccessibleFiles] = useState(new Map());
   const [showFilePicker, setShowFilePicker] = useState(false);
+  const [showFileModal, setShowFileModal] = useState(false);
   const intervalRef = useRef(null);
   const lastModifiedRef = useRef(null);
 
@@ -108,6 +109,7 @@ const FileWatcher = ({ onBack, isRestoring }) => {
       await loadFile(filePath);
       startWatching(filePath);
       setShowFilePicker(false);
+      setShowFileModal(false);
       setError(null);
     } catch (err) {
       console.error('Error selecting specific file:', err);
@@ -284,6 +286,11 @@ const FileWatcher = ({ onBack, isRestoring }) => {
               <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap flex-shrink-0 max-sm:text-[10px] max-sm:px-1 ${isWatching ? 'bg-green-800 text-green-200' : 'bg-orange-800 text-orange-200'}`}>
                 {isWatching ? '👁️ Watching' : '⏸️ Stopped'}
               </span>
+              {accessibleFiles.size > 1 && (
+                <button className="bg-blue-600 border-0 text-white px-2.5 py-1.5 rounded-sm text-[11px] transition-colors hover:bg-blue-500 whitespace-nowrap flex-shrink-0" onClick={() => setShowFileModal(true)}>
+                  📄 Files ({accessibleFiles.size})
+                </button>
+              )}
               <button className="bg-gray-500 border-0 text-white px-2.5 py-1.5 rounded-sm text-[11px] transition-colors hover:bg-gray-400 whitespace-nowrap flex-shrink-0 max-lg:hidden" onClick={selectDirectory}>
                 Change Dir
               </button>
@@ -348,6 +355,88 @@ const FileWatcher = ({ onBack, isRestoring }) => {
       ) : (
         <div className="flex-1 overflow-hidden">
           <MarkdownPreview markdown={fileContent} onLinkClick={handleLinkClick} />
+        </div>
+      )}
+
+      {/* File Selection Modal */}
+      {showFileModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-neutral-800 border border-neutral-600 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden">
+            <div className="border-b border-neutral-600 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-white">Select a file to watch</h3>
+                <button 
+                  className="text-gray-400 hover:text-white transition-colors"
+                  onClick={() => setShowFileModal(false)}
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="text-gray-400 text-sm mt-1">
+                {accessibleFiles.size} markdown file{accessibleFiles.size !== 1 ? 's' : ''} available
+              </p>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              <div className="space-y-3">
+                {Array.from(accessibleFiles.entries()).map(([relativePath, fullPath]) => {
+                  const isCurrentFile = fullPath === selectedFile;
+                  return (
+                    <button
+                      key={fullPath}
+                      className={`w-full border text-left px-4 py-3 rounded-lg transition-colors group ${
+                        isCurrentFile 
+                          ? 'bg-indigo-600 border-indigo-500 text-white' 
+                          : 'bg-gray-700 hover:bg-gray-600 border-gray-600 hover:border-indigo-500 text-white'
+                      }`}
+                      onClick={() => selectSpecificFile(fullPath)}
+                      disabled={isCurrentFile}
+                    >
+                      <div className={`font-medium flex items-center justify-between ${
+                        isCurrentFile 
+                          ? 'text-white' 
+                          : 'text-white group-hover:text-indigo-200'
+                      }`}>
+                        <span>{relativePath}</span>
+                        {isCurrentFile && (
+                          <span className="text-xs bg-indigo-500 px-2 py-1 rounded-full">
+                            Current
+                          </span>
+                        )}
+                      </div>
+                      <div className={`text-xs mt-1 font-mono truncate ${
+                        isCurrentFile 
+                          ? 'text-indigo-100' 
+                          : 'text-gray-400'
+                      }`}>
+                        {fullPath}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            
+            <div className="border-t border-neutral-600 px-6 py-4 bg-neutral-750">
+              <div className="flex items-center justify-between">
+                <button 
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm transition-colors"
+                  onClick={() => {
+                    setShowFileModal(false);
+                    selectDirectory();
+                  }}
+                >
+                  📁 Choose Different Directory
+                </button>
+                <button 
+                  className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded text-sm transition-colors"
+                  onClick={() => setShowFileModal(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
