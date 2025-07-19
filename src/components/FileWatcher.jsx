@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
-import { readTextFile, exists } from '@tauri-apps/plugin-fs';
+import { readTextFile, exists, readDir } from '@tauri-apps/plugin-fs';
 import MarkdownPreview from './MarkdownPreview';
 import { storage } from '../utils/storage';
 
 const FileWatcher = ({ onBack, isRestoring }) => {
   const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedDirectory, setSelectedDirectory] = useState(null);
   const [fileContent, setFileContent] = useState('');
   const [error, setError] = useState(null);
   const [isWatching, setIsWatching] = useState(false);
+  const [accessibleFiles, setAccessibleFiles] = useState(new Map());
+  const [showFilePicker, setShowFilePicker] = useState(false);
   const intervalRef = useRef(null);
   const lastModifiedRef = useRef(null);
 
@@ -19,10 +22,100 @@ const FileWatcher = ({ onBack, isRestoring }) => {
         setSelectedFile(savedFile);
         loadFile(savedFile);
         startWatching(savedFile);
+        
+        // Scan directory for accessible files when restoring
+        const fileDir = savedFile.substring(0, savedFile.lastIndexOf('/'));
+        scanForMarkdownFiles(fileDir).then(foundFiles => {
+          setAccessibleFiles(foundFiles);
+          console.log('Restored accessible files:', Object.fromEntries(foundFiles));
+        }).catch(err => {
+          console.log('Could not scan directory on restore:', err);
+        });
       }
     }
   }, [isRestoring]);
 
+  const scanForMarkdownFiles = async (dirPath, baseDir = null) => {
+    const markdownFiles = new Map();
+    
+    try {
+      const entries = await readDir(dirPath);
+      
+      for (const entry of entries) {
+        if (entry.isFile && entry.name.match(/\.(md|markdown|mdown|mkd|mdx)$/i)) {
+          const fullPath = `${dirPath}/${entry.name}`;
+          const relativePath = baseDir ? fullPath.replace(baseDir + '/', '') : entry.name;
+          console.log(`Found markdown file: ${entry.name} -> ${relativePath} (${fullPath})`);
+          markdownFiles.set(relativePath, fullPath);
+        } else if (entry.isDirectory) {
+          // Recursively scan subdirectories
+          const subDirPath = `${dirPath}/${entry.name}`;
+          try {
+            const subFiles = await scanForMarkdownFiles(subDirPath, baseDir || dirPath);
+            subFiles.forEach((fullPath, relativePath) => {
+              markdownFiles.set(relativePath, fullPath);
+            });
+          } catch (subDirError) {
+            console.log(`Cannot access subdirectory ${entry.name}:`, subDirError);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error scanning directory:', error);
+    }
+    
+    return markdownFiles;
+  };
+
+  const selectDirectory = async () => {
+    try {
+      setError(null);
+      const directory = await open({
+        title: 'Select Directory with Markdown Files',
+        directory: true,
+        multiple: false
+      });
+
+      console.log('Selected directory:', directory);
+
+      if (directory && directory !== null) {
+        setSelectedDirectory(directory);
+        
+        // Scan directory for markdown files
+        console.log('Scanning directory for markdown files:', directory);
+        const foundFiles = await scanForMarkdownFiles(directory);
+        setAccessibleFiles(foundFiles);
+        console.log('Found accessible markdown files:', Object.fromEntries(foundFiles));
+        
+        // If files found, show file picker
+        if (foundFiles.size > 0) {
+          setShowFilePicker(true);
+          setError(null);
+        } else {
+          setError('No markdown files found in the selected directory.');
+        }
+      }
+    } catch (err) {
+      console.error('Directory selection error:', err);
+      setError(`Failed to select directory: ${err?.message || 'Unknown error'}`);
+    }
+  };
+
+  const selectSpecificFile = async (filePath) => {
+    try {
+      setSelectedFile(filePath);
+      storage.saveWatchedFile(filePath);
+      await loadFile(filePath);
+      startWatching(filePath);
+      setShowFilePicker(false);
+      setError(null);
+    } catch (err) {
+      console.error('Error selecting specific file:', err);
+      setError(`Failed to load file: ${err?.message || 'Unknown error'}`);
+    }
+  };
+
+  // Keep the old selectFile function as fallback
   const selectFile = async () => {
     try {
       setError(null);
@@ -44,10 +137,17 @@ const FileWatcher = ({ onBack, isRestoring }) => {
       console.log('Selected file:', file);
 
       if (file && file !== null) {
-        setSelectedFile(file);
-        storage.saveWatchedFile(file);
-        await loadFile(file);
-        startWatching(file);
+        await selectSpecificFile(file);
+        
+        // Try to scan directory for other files (may fail due to permissions)
+        const fileDir = file.substring(0, file.lastIndexOf('/'));
+        try {
+          const foundFiles = await scanForMarkdownFiles(fileDir);
+          setAccessibleFiles(foundFiles);
+          setSelectedDirectory(fileDir);
+        } catch (scanError) {
+          console.log('Could not scan directory, using single file mode:', scanError);
+        }
       }
     } catch (err) {
       console.error('File selection error:', err);
@@ -107,6 +207,59 @@ const FileWatcher = ({ onBack, isRestoring }) => {
     setIsWatching(false);
   };
 
+  const handleLinkClick = async (relativePath) => {
+    if (!selectedFile) return;
+    
+    try {
+      const fileName = relativePath.replace('./', '');
+      console.log('Link clicked for:', fileName);
+      console.log('Available files:', Object.fromEntries(accessibleFiles));
+      
+      // Check if we have this file in our accessible files map
+      let targetFilePath = null;
+      
+      // Try exact match first
+      if (accessibleFiles.has(fileName)) {
+        targetFilePath = accessibleFiles.get(fileName);
+      } else {
+        // Try to find a match by checking all keys
+        for (const [key, value] of accessibleFiles) {
+          if (key.endsWith(fileName) || key === fileName) {
+            targetFilePath = value;
+            break;
+          }
+        }
+      }
+      
+      if (targetFilePath) {
+        console.log('Switching to accessible file:', targetFilePath);
+        
+        // Stop watching current file
+        stopWatching();
+        
+        // Switch to the new file
+        setSelectedFile(targetFilePath);
+        storage.saveWatchedFile(targetFilePath);
+        await loadFile(targetFilePath);
+        startWatching(targetFilePath);
+        setError(null);
+        
+      } else {
+        console.log('File not found in accessible files, prompting user');
+        setError(`Cannot find "${fileName}" in accessible files. Please select this file manually.`);
+        
+        // Auto-open directory dialog after 2 seconds
+        setTimeout(() => {
+          selectDirectory();
+        }, 2000);
+      }
+      
+    } catch (err) {
+      console.error('Error in link click handler:', err);
+      setError(`Failed to switch to file: ${err?.message || 'Unknown error'}`);
+    }
+  };
+
   useEffect(() => {
     return () => {
       stopWatching();
@@ -122,8 +275,8 @@ const FileWatcher = ({ onBack, isRestoring }) => {
         <h2 className="text-white m-0 text-base font-semibold whitespace-nowrap overflow-hidden text-ellipsis max-md:hidden">File Watcher Mode</h2>
         <div className="ml-auto flex items-center gap-2 flex-shrink-0">
           {!selectedFile ? (
-            <button className="bg-indigo-600 border-0 text-white px-4 py-2 rounded text-xs font-medium transition-colors hover:bg-indigo-700 whitespace-nowrap max-sm:px-3 max-sm:py-1.5 max-sm:text-xs" onClick={selectFile}>
-              📁 Select Markdown File
+            <button className="bg-indigo-600 border-0 text-white px-4 py-2 rounded text-xs font-medium transition-colors hover:bg-indigo-700 whitespace-nowrap max-sm:px-3 max-sm:py-1.5 max-sm:text-xs" onClick={selectDirectory}>
+              📁 Select Directory
             </button>
           ) : (
             <div className="flex items-center gap-2 overflow-hidden min-w-0">
@@ -131,8 +284,8 @@ const FileWatcher = ({ onBack, isRestoring }) => {
               <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap flex-shrink-0 max-sm:text-[10px] max-sm:px-1 ${isWatching ? 'bg-green-800 text-green-200' : 'bg-orange-800 text-orange-200'}`}>
                 {isWatching ? '👁️ Watching' : '⏸️ Stopped'}
               </span>
-              <button className="bg-gray-500 border-0 text-white px-2.5 py-1.5 rounded-sm text-[11px] transition-colors hover:bg-gray-400 whitespace-nowrap flex-shrink-0 max-lg:hidden" onClick={selectFile}>
-                Change File
+              <button className="bg-gray-500 border-0 text-white px-2.5 py-1.5 rounded-sm text-[11px] transition-colors hover:bg-gray-400 whitespace-nowrap flex-shrink-0 max-lg:hidden" onClick={selectDirectory}>
+                Change Dir
               </button>
             </div>
           )}
@@ -145,20 +298,56 @@ const FileWatcher = ({ onBack, isRestoring }) => {
         </div>
       )}
 
-      {!selectedFile ? (
+      {showFilePicker ? (
+        <div className="flex-1 flex items-center justify-center bg-neutral-900 overflow-y-auto">
+          <div className="text-center text-gray-400 p-4 max-w-2xl w-full">
+            <div className="text-4xl mb-4">📋</div>
+            <h3 className="text-gray-200 mb-2 text-2xl font-semibold max-sm:text-xl">Select a markdown file</h3>
+            <p className="mb-6 text-base max-sm:text-sm max-sm:mb-4">Found {accessibleFiles.size} markdown file{accessibleFiles.size !== 1 ? 's' : ''} in the directory</p>
+            
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+              {Array.from(accessibleFiles.entries()).map(([relativePath, fullPath]) => (
+                <button
+                  key={fullPath}
+                  className="w-full bg-gray-700 hover:bg-gray-600 border border-gray-600 hover:border-indigo-500 text-white px-4 py-3 rounded-lg text-left transition-colors group"
+                  onClick={() => selectSpecificFile(fullPath)}
+                >
+                  <div className="font-medium text-white group-hover:text-indigo-200">
+                    {relativePath}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1 font-mono truncate">
+                    {fullPath}
+                  </div>
+                </button>
+              ))}
+            </div>
+            
+            <button 
+              className="mt-6 bg-gray-600 border-0 text-white px-6 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-gray-700"
+              onClick={() => {
+                setShowFilePicker(false);
+                setSelectedDirectory(null);
+                setAccessibleFiles(new Map());
+              }}
+            >
+              ← Choose Different Directory
+            </button>
+          </div>
+        </div>
+      ) : !selectedFile ? (
         <div className="flex-1 flex items-center justify-center bg-neutral-900 overflow-y-auto">
           <div className="text-center text-gray-400 p-4">
             <div className="text-6xl mb-4 max-sm:text-5xl">📄</div>
-            <h3 className="text-gray-200 mb-2 text-2xl font-semibold max-sm:text-xl">No file selected</h3>
-            <p className="mb-6 text-base max-sm:text-sm max-sm:mb-4">Choose a markdown file to watch for changes</p>
-            <button className="bg-indigo-600 border-0 text-white px-8 py-4 rounded-lg text-base font-semibold transition-colors hover:bg-indigo-700 max-sm:px-6 max-sm:py-3 max-sm:text-sm" onClick={selectFile}>
-              📁 Select File
+            <h3 className="text-gray-200 mb-2 text-2xl font-semibold max-sm:text-xl">No directory selected</h3>
+            <p className="mb-6 text-base max-sm:text-sm max-sm:mb-4">Choose a directory with markdown files to watch</p>
+            <button className="bg-indigo-600 border-0 text-white px-8 py-4 rounded-lg text-base font-semibold transition-colors hover:bg-indigo-700 max-sm:px-6 max-sm:py-3 max-sm:text-sm" onClick={selectDirectory}>
+              📁 Select Directory
             </button>
           </div>
         </div>
       ) : (
         <div className="flex-1 overflow-hidden">
-          <MarkdownPreview markdown={fileContent} />
+          <MarkdownPreview markdown={fileContent} onLinkClick={handleLinkClick} />
         </div>
       )}
     </div>

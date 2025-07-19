@@ -20,3 +20,121 @@ html, body {
   color: #e5e5e5;
   overflow: hidden;
 }
+
+/* Global styles for markdown content that can't be styled with Tailwind classes */
+.preview-content h1,
+.preview-content h2,
+.preview-content h3,
+.preview-content h4,
+.preview-content h5,
+.preview-content h6 {
+  color: #fff;
+  margin-top: 32px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.preview-content h1 {
+  font-size: 2em;
+  border-bottom: 1px solid #333;
+  padding-bottom: 8px;
+}
+
+.preview-content h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid #333;
+  padding-bottom: 6px;
+}
+
+.preview-content h3 {
+  font-size: 1.25em;
+}
+
+.preview-content p {
+  margin-bottom: 16px;
+}
+
+.preview-content code {
+  background-color: #2d2d2d;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 0.9em;
+}
+
+.preview-content pre {
+  background-color: #2d2d2d;
+  padding: 16px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+
+.preview-content pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.preview-content blockquote {
+  border-left: 4px solid #4f46e5;
+  padding-left: 16px;
+  margin: 16px 0;
+  color: #b3b3b3;
+  font-style: italic;
+}
+
+.preview-content ul,
+.preview-content ol {
+  padding-left: 24px;
+  margin-bottom: 16px;
+}
+
+.preview-content li {
+  margin-bottom: 8px;
+}
+
+.preview-content a {
+  color: #4f46e5;
+  text-decoration: none;
+}
+
+.preview-content a:hover {
+  text-decoration: underline;
+}
+
+.preview-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+}
+
+.preview-content th,
+.preview-content td {
+  border: 1px solid #333;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.preview-content th {
+  background-color: #2d2d2d;
+  font-weight: 600;
+}
+
+.mermaid-diagram {
+  margin: 24px 0;
+  text-align: center;
+}
+
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-error {
+  background-color: #dc2626;
+  color: white;
+  padding: 12px;
+  border-radius: 6px;
+  margin: 16px 0;
+  font-family: monospace;
+}

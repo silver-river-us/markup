@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import mermaid from 'mermaid';
 
-const MarkdownPreview = ({ markdown }) => {
+const MarkdownPreview = ({ markdown, onLinkClick }) => {
   const previewRef = useRef(null);
 
   useEffect(() => {
@@ -28,15 +28,65 @@ const MarkdownPreview = ({ markdown }) => {
     const renderMarkdown = async () => {
       if (!previewRef.current) return;
 
+      // Configure marked to generate header IDs
+      marked.setOptions({
+        headerIds: true,
+        mangle: false
+      });
+
       // Parse markdown to HTML
       const html = marked.parse(markdown);
       previewRef.current.innerHTML = html;
 
-      // Make all links open in new tab
+      // Manually add IDs to headers if they don't have them
+      const headers = previewRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      headers.forEach(header => {
+        if (!header.id) {
+          // Generate ID from header text
+          const id = header.textContent
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+            .replace(/\s+/g, '-') // Replace spaces with hyphens
+            .replace(/-+/g, '-') // Replace multiple hyphens with single
+            .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+          header.id = id;
+          console.log(`Added ID "${id}" to header "${header.textContent}"`);
+        }
+      });
+
+      // Handle links
       const links = previewRef.current.querySelectorAll('a');
       links.forEach(link => {
-        link.setAttribute('target', '_blank');
-        link.setAttribute('rel', 'noopener noreferrer');
+        const href = link.getAttribute('href');
+        
+        // Check if it's an anchor link (internal page link)
+        if (href && href.startsWith('#')) {
+          link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const targetId = href.substring(1); // Remove the #
+            const targetElement = previewRef.current.querySelector(`[id="${targetId}"]`);
+            if (targetElement) {
+              targetElement.scrollIntoView({ 
+                behavior: 'smooth',
+                block: 'start'
+              });
+            }
+          });
+          link.style.cursor = 'pointer';
+        }
+        // Check if it's a relative markdown file link
+        else if (href && href.startsWith('./') && href.endsWith('.md') && onLinkClick) {
+          link.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('Cross-file link clicked:', href);
+            onLinkClick(href);
+          });
+          link.style.cursor = 'pointer';
+        } else {
+          // For external links, open in new tab
+          link.setAttribute('target', '_blank');
+          link.setAttribute('rel', 'noopener noreferrer');
+        }
       });
 
       // Find and render mermaid diagrams
@@ -54,9 +104,9 @@ const MarkdownPreview = ({ markdown }) => {
           
           // Replace the entire pre element, not just the code element
           const preElement = element.closest('pre');
-          if (preElement) {
+          if (preElement && preElement.parentNode) {
             preElement.parentNode.replaceChild(wrapper, preElement);
-          } else {
+          } else if (element.parentNode) {
             element.parentNode.replaceChild(wrapper, element);
           }
         } catch (error) {
@@ -66,9 +116,9 @@ const MarkdownPreview = ({ markdown }) => {
           errorDiv.textContent = `Error rendering diagram: ${error.message}`;
           
           const preElement = element.closest('pre');
-          if (preElement) {
+          if (preElement && preElement.parentNode) {
             preElement.parentNode.replaceChild(errorDiv, preElement);
-          } else {
+          } else if (element.parentNode) {
             element.parentNode.replaceChild(errorDiv, element);
           }
         }

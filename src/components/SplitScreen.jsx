@@ -62,7 +62,7 @@ const SplitScreen = ({ onBack, isRestoring }) => {
           <MarkdownEditor value={markdown} onChange={handleMarkdownChange} />
         </div>
         <div className="flex-1 flex flex-col min-w-0 h-[calc(100vh-48px)] max-md:h-[50vh] max-md:min-h-[250px]">
-          <MarkdownPreview markdown={markdown} />
+          <MarkdownPreview markdown={markdown} onLinkClick={null} />
         </div>
       </div>
     </div>
