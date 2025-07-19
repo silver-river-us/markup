@@ -11,7 +11,7 @@ const MarkdownEditor = ({ value, onChange }) => {
         <h3>Editor</h3>
       </div>
       <Editor
-        height="calc(100vh - 49px)"
+        height="calc(100vh - 114px)"
         defaultLanguage="markdown"
         value={value}
         onChange={handleEditorChange}
