@@ -21,8 +21,8 @@ const MarkdownEditor = ({ value, onChange }) => {
   const editorHeight = isNarrowScreen ? 'calc(50vh - 28px)' : 'calc(100vh - 76px)';
 
   return (
-    <div className="markdown-editor">
-      <div className="editor-header">
+    <div className="flex-1 flex flex-col overflow-hidden h-full">
+      <div className="bg-neutral-700 px-4 py-1 border-b border-neutral-600 text-white text-xs font-medium flex-shrink-0 h-7 flex items-center">
         <h3>Editor</h3>
       </div>
       <Editor
