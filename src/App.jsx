@@ -45,7 +45,7 @@ function App() {
   }, [currentMode]);
 
   return (
-    <div className="app">
+    <div className="h-screen m-0 p-0 font-sans overflow-hidden">
       {renderCurrentMode()}
     </div>
   );
