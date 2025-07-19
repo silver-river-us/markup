@@ -32,6 +32,13 @@ const MarkdownPreview = ({ markdown }) => {
       const html = marked.parse(markdown);
       previewRef.current.innerHTML = html;
 
+      // Make all links open in new tab
+      const links = previewRef.current.querySelectorAll('a');
+      links.forEach(link => {
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener noreferrer');
+      });
+
       // Find and render mermaid diagrams
       const mermaidElements = previewRef.current.querySelectorAll('code.language-mermaid');
       
@@ -72,11 +79,11 @@ const MarkdownPreview = ({ markdown }) => {
   }, [markdown]);
 
   return (
-    <div className="markdown-preview">
-      <div className="preview-header">
+    <div className="flex-1 flex flex-col bg-neutral-900 overflow-hidden h-full">
+      <div className="bg-neutral-700 px-4 py-1 border-b border-neutral-600 text-white text-xs font-medium flex-shrink-0 h-7 flex items-center">
         <h3>Preview</h3>
       </div>
-      <div className="preview-content" ref={previewRef}></div>
+      <div className="flex-1 p-6 overflow-y-auto bg-neutral-900 text-gray-200 font-sans leading-relaxed preview-content" ref={previewRef}></div>
     </div>
   );
 };
