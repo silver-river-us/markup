@@ -2,15 +2,27 @@ import { useState, useEffect, useRef } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readTextFile, exists } from '@tauri-apps/plugin-fs';
 import MarkdownPreview from './MarkdownPreview';
+import { storage } from '../utils/storage';
 import './FileWatcher.css';
 
-const FileWatcher = ({ onBack }) => {
+const FileWatcher = ({ onBack, isRestoring }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileContent, setFileContent] = useState('');
   const [error, setError] = useState(null);
   const [isWatching, setIsWatching] = useState(false);
   const intervalRef = useRef(null);
   const lastModifiedRef = useRef(null);
+
+  useEffect(() => {
+    if (isRestoring) {
+      const savedFile = storage.getWatchedFile();
+      if (savedFile) {
+        setSelectedFile(savedFile);
+        loadFile(savedFile);
+        startWatching(savedFile);
+      }
+    }
+  }, [isRestoring]);
 
   const selectFile = async () => {
     try {
@@ -34,6 +46,7 @@ const FileWatcher = ({ onBack }) => {
 
       if (file && file !== null) {
         setSelectedFile(file);
+        storage.saveWatchedFile(file);
         await loadFile(file);
         startWatching(file);
       }
