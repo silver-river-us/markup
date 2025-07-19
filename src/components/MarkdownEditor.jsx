@@ -1,9 +1,24 @@
+import { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 
 const MarkdownEditor = ({ value, onChange }) => {
+  const [isNarrowScreen, setIsNarrowScreen] = useState(false);
+
+  useEffect(() => {
+    const checkScreenWidth = () => {
+      setIsNarrowScreen(window.innerWidth <= 768);
+    };
+
+    checkScreenWidth();
+    window.addEventListener('resize', checkScreenWidth);
+    return () => window.removeEventListener('resize', checkScreenWidth);
+  }, []);
+
   const handleEditorChange = (value) => {
     onChange(value || '');
   };
+
+  const editorHeight = isNarrowScreen ? 'calc(50vh - 28px)' : 'calc(100vh - 76px)';
 
   return (
     <div className="markdown-editor">
@@ -11,7 +26,7 @@ const MarkdownEditor = ({ value, onChange }) => {
         <h3>Editor</h3>
       </div>
       <Editor
-        height="calc(100vh - 114px)"
+        height={editorHeight}
         defaultLanguage="markdown"
         value={value}
         onChange={handleEditorChange}
