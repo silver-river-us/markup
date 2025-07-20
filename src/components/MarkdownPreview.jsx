@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import mermaid from 'mermaid';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
-const MarkdownPreview = ({ markdown, onLinkClick }) => {
+const MarkdownPreview = ({ markdown, onLinkClick, currentFilePath }) => {
   const previewRef = useRef(null);
 
   useEffect(() => {
@@ -89,6 +90,44 @@ const MarkdownPreview = ({ markdown, onLinkClick }) => {
         }
       });
 
+      // Handle images with relative paths
+      const images = previewRef.current.querySelectorAll('img');
+      images.forEach(img => {
+        const src = img.getAttribute('src');
+        
+        // Check if it's a relative path (not http/https/data URLs)
+        if (src && !src.startsWith('http') && !src.startsWith('data:') && !src.startsWith('file:') && !src.startsWith('tauri://')) {
+          if (currentFilePath) {
+            let fullImagePath;
+            const fileDir = currentFilePath.substring(0, currentFilePath.lastIndexOf('/'));
+            
+            if (src.startsWith('./')) {
+              // Handle ./relative/path
+              const relativePath = src.replace('./', '');
+              fullImagePath = `${fileDir}/${relativePath}`;
+            } else if (src.startsWith('../')) {
+              // Handle ../relative/path
+              fullImagePath = `${fileDir}/${src}`;
+            } else if (!src.startsWith('/')) {
+              // Handle relative/path (no ./ prefix)
+              fullImagePath = `${fileDir}/${src}`;
+            } else {
+              // Absolute path, use as-is
+              fullImagePath = src;
+            }
+            
+            try {
+              const convertedSrc = convertFileSrc(fullImagePath);
+              img.src = convertedSrc;
+              console.log(`Converting image: ${src} -> ${fullImagePath} -> ${convertedSrc}`);
+            } catch (error) {
+              console.error('Failed to convert image path:', error);
+              console.log(`Failed path: ${fullImagePath}`);
+            }
+          }
+        }
+      });
+
       // Find and render mermaid diagrams
       const mermaidElements = previewRef.current.querySelectorAll('code.language-mermaid');
       
@@ -126,7 +165,7 @@ const MarkdownPreview = ({ markdown, onLinkClick }) => {
     };
 
     renderMarkdown();
-  }, [markdown]);
+  }, [markdown, currentFilePath]);
 
   return (
     <div className="flex-1 flex flex-col bg-neutral-900 overflow-hidden h-full">

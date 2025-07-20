@@ -374,7 +374,7 @@ const FileWatcher = ({ onBack, isRestoring }) => {
         </div>
       ) : (
         <div className="flex-1 overflow-hidden">
-          <MarkdownPreview markdown={fileContent} onLinkClick={handleLinkClick} />
+          <MarkdownPreview markdown={fileContent} onLinkClick={handleLinkClick} currentFilePath={selectedFile} />
         </div>
       )}
 
