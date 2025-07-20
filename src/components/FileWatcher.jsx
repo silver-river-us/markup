@@ -17,12 +17,68 @@ const FileWatcher = ({ onBack, isRestoring }) => {
   const lastModifiedRef = useRef(null);
 
   useEffect(() => {
-    // Clear any stale localStorage state that might cause permission errors
-    if (isRestoring) {
-      console.log('Clearing localStorage state to prevent permission errors');
-      storage.clearState();
-      setError(null);
-    }
+    const restoreSession = async () => {
+      if (isRestoring) {
+        const savedFile = storage.getWatchedFile();
+        const savedDirectory = storage.getWatchedDirectory();
+        
+        if (savedFile && savedDirectory) {
+          // First try to scan the directory to validate permissions
+          try {
+            console.log('Attempting to restore session with saved directory:', savedDirectory);
+            const foundFiles = await scanForMarkdownFiles(savedDirectory);
+            setAccessibleFiles(foundFiles);
+            
+            // Check if the saved file is still accessible
+            const fileName = savedFile.split('/').pop();
+            if (foundFiles.has(fileName) || Array.from(foundFiles.values()).includes(savedFile)) {
+              setSelectedFile(savedFile);
+              setSelectedDirectory(savedDirectory);
+              loadFile(savedFile);
+              startWatching(savedFile);
+              console.log('Successfully restored file and directory context');
+            } else {
+              console.log('Saved file no longer accessible, clearing file state but keeping directory');
+              setError('Previously selected file is no longer accessible. Please select a file from the directory.');
+              storage.saveWatchedFile(null); // Clear only the file, keep directory
+              setShowFilePicker(true); // Show file picker with available files
+            }
+          } catch (err) {
+            console.log('Could not access saved directory on restore:', err);
+            if (err.message && err.message.includes('forbidden path')) {
+              setError('Lost access to previously selected directory. Please select a directory again.');
+              storage.clearState(); // Only clear state if it's a permission error
+            } else {
+              // For other errors, just show the file picker
+              setError('Could not restore previous session. Please select a directory.');
+            }
+          }
+        } else if (savedFile) {
+          // Fallback: try to derive directory from file path
+          const fileDir = savedFile.substring(0, savedFile.lastIndexOf('/'));
+          try {
+            console.log('Attempting to derive directory from saved file path:', fileDir);
+            const foundFiles = await scanForMarkdownFiles(fileDir);
+            setAccessibleFiles(foundFiles);
+            setSelectedDirectory(fileDir);
+            setSelectedFile(savedFile);
+            storage.saveWatchedDirectory(fileDir);
+            loadFile(savedFile);
+            startWatching(savedFile);
+          } catch (err) {
+            console.log('Could not access derived directory on restore:', err);
+            if (err.message && err.message.includes('forbidden path')) {
+              setError('Lost access to file. Please select a directory again.');
+              storage.clearState(); // Only clear state if it's a permission error
+            } else {
+              setError('Could not restore previous session. Please select a directory.');
+            }
+          }
+        }
+      }
+    };
+
+    restoreSession();
   }, [isRestoring]);
 
   const scanForMarkdownFiles = async (dirPath) => {

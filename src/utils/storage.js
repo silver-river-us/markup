@@ -51,7 +51,11 @@ export const storage = {
   // Save watched file path
   saveWatchedFile: (filePath) => {
     try {
-      localStorage.setItem(STORAGE_KEYS.WATCHED_FILE, filePath);
+      if (filePath === null || filePath === undefined) {
+        localStorage.removeItem(STORAGE_KEYS.WATCHED_FILE);
+      } else {
+        localStorage.setItem(STORAGE_KEYS.WATCHED_FILE, filePath);
+      }
     } catch (error) {
       console.warn('Failed to save watched file to localStorage:', error);
     }
