@@ -34,7 +34,7 @@ const FileWatcher = ({ onBack, isRestoring }) => {
             if (foundFiles.has(fileName) || Array.from(foundFiles.values()).includes(savedFile)) {
               setSelectedFile(savedFile);
               setSelectedDirectory(savedDirectory);
-              loadFile(savedFile);
+              loadFile(savedFile, true); // Allow state clearing during restoration
               startWatching(savedFile);
               console.log('Successfully restored file and directory context');
             } else {
@@ -47,7 +47,7 @@ const FileWatcher = ({ onBack, isRestoring }) => {
             console.log('Could not access saved directory on restore:', err);
             if (err.message && err.message.includes('forbidden path')) {
               setError('Lost access to previously selected directory. Please select a directory again.');
-              storage.clearState(); // Only clear state if it's a permission error
+              storage.clearWatcherState(); // Only clear state if it's a permission error
             } else {
               // For other errors, just show the file picker
               setError('Could not restore previous session. Please select a directory.');
@@ -63,13 +63,13 @@ const FileWatcher = ({ onBack, isRestoring }) => {
             setSelectedDirectory(fileDir);
             setSelectedFile(savedFile);
             storage.saveWatchedDirectory(fileDir);
-            loadFile(savedFile);
+            loadFile(savedFile, true); // Allow state clearing during restoration
             startWatching(savedFile);
           } catch (err) {
             console.log('Could not access derived directory on restore:', err);
             if (err.message && err.message.includes('forbidden path')) {
               setError('Lost access to file. Please select a directory again.');
-              storage.clearState(); // Only clear state if it's a permission error
+              storage.clearWatcherState(); // Only clear state if it's a permission error
             } else {
               setError('Could not restore previous session. Please select a directory.');
             }
@@ -158,7 +158,7 @@ const FileWatcher = ({ onBack, isRestoring }) => {
     try {
       setSelectedFile(filePath);
       storage.saveWatchedFile(filePath);
-      await loadFile(filePath);
+      await loadFile(filePath, false); // Don't clear state during normal file selection
       startWatching(filePath);
       setShowFilePicker(false);
       setShowFileModal(false);
@@ -210,7 +210,7 @@ const FileWatcher = ({ onBack, isRestoring }) => {
     }
   };
 
-  const loadFile = async (filePath) => {
+  const loadFile = async (filePath, shouldClearStateOnError = false) => {
     try {
       setError(null);
       console.log('Loading file:', filePath);
@@ -220,15 +220,19 @@ const FileWatcher = ({ onBack, isRestoring }) => {
     } catch (err) {
       console.error('Load file error:', err);
       
-      // If we get a forbidden path error, reset state and ask for reselection
+      // If we get a forbidden path error, only clear state if explicitly requested
       if (err.message && err.message.includes('forbidden path')) {
-        setError('Lost access to file. Please select the directory again to restore permissions.');
-        setSelectedFile(null);
-        setSelectedDirectory(null);
-        setAccessibleFiles(new Map());
-        setFileContent('');
-        // Clear the invalid saved state
-        storage.clearState();
+        if (shouldClearStateOnError) {
+          setError('Lost access to file. Please select the directory again to restore permissions.');
+          setSelectedFile(null);
+          setSelectedDirectory(null);
+          setAccessibleFiles(new Map());
+          setFileContent('');
+          storage.clearWatcherState();
+        } else {
+          setError('Lost access to file. File may have been moved or permissions changed.');
+          setFileContent('');
+        }
       } else {
         setError(`Failed to read file: ${err?.message || 'Unknown error'}`);
         setFileContent('');
@@ -246,9 +250,10 @@ const FileWatcher = ({ onBack, isRestoring }) => {
         return;
       }
 
-      // For simplicity, we'll just reload the file content periodically
-      // In a real implementation, you might want to use file system watchers
-      await loadFile(filePath);
+      // Read file content directly without using loadFile to avoid clearing state
+      const content = await readTextFile(filePath);
+      setFileContent(content);
+      setError(null); // Clear any previous errors
     } catch (err) {
       console.error('Error checking file changes:', err);
       
@@ -260,7 +265,10 @@ const FileWatcher = ({ onBack, isRestoring }) => {
         setSelectedDirectory(null);
         setAccessibleFiles(new Map());
         // Clear the invalid saved state
-        storage.clearState();
+        storage.clearWatcherState();
+      } else {
+        // For other errors, just log them but don't clear state or stop watching
+        console.log('Temporary error reading file during watching:', err.message);
       }
     }
   };
@@ -318,7 +326,7 @@ const FileWatcher = ({ onBack, isRestoring }) => {
         // Switch to the new file
         setSelectedFile(targetFilePath);
         storage.saveWatchedFile(targetFilePath);
-        await loadFile(targetFilePath);
+        await loadFile(targetFilePath, false); // Don't clear state during link navigation
         startWatching(targetFilePath);
         setError(null);
         

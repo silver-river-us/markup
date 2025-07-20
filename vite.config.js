@@ -26,7 +26,8 @@ export default defineConfig(async () => ({
       : undefined,
     watch: {
       // 3. tell vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      // 4. ignore markdown files to prevent hot reload when watching files
+      ignored: ["**/src-tauri/**", "**/*.md", "**/*.markdown", "**/*.mdown", "**/*.mkd", "**/*.mdx"],
     },
   },
 }));

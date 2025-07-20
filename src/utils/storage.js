@@ -116,5 +116,15 @@ export const storage = {
     } catch (error) {
       console.warn('Failed to clear state from localStorage:', error);
     }
+  },
+
+  // Clear only file watcher related state, preserve mode
+  clearWatcherState: () => {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.WATCHED_FILE);
+      localStorage.removeItem(STORAGE_KEYS.WATCHED_DIRECTORY);
+    } catch (error) {
+      console.warn('Failed to clear watcher state from localStorage:', error);
+    }
   }
 };
