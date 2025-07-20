@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import Homepage from "./components/Homepage";
 import SplitScreen from "./components/SplitScreen";
 import FileWatcher from "./components/FileWatcher";
-import { storage } from "./utils/storage";
+import { storage } from "./services/storage";
 import "./App.css";
 
 function App() {

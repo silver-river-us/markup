@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { storage } from '../utils/storage';
+import { storage } from '../services/storage';
 
 const Homepage = ({ onSelectMode, onContinue }) => {
   const [savedState, setSavedState] = useState(null);

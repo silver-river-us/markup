@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import MarkdownEditor from './MarkdownEditor';
 import MarkdownPreview from './MarkdownPreview';
-import { storage } from '../utils/storage';
+import { storage } from '../services/storage';
 
 const defaultMarkdown = `# Welcome to Markup
 

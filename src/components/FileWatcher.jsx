@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readTextFile, exists, readDir } from '@tauri-apps/plugin-fs';
 import MarkdownPreview from './MarkdownPreview';
-import { storage } from '../utils/storage';
+import { storage } from '../services/storage';
 
 const FileWatcher = ({ onBack, isRestoring }) => {
   const [selectedFile, setSelectedFile] = useState(null);
