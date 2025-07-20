@@ -4,6 +4,7 @@ const STORAGE_KEYS = {
   LAST_MODE: 'markup_last_mode',
   EDITOR_CONTENT: 'markup_editor_content',
   WATCHED_FILE: 'markup_watched_file',
+  WATCHED_DIRECTORY: 'markup_watched_directory',
   LAST_USED: 'markup_last_used'
 };
 
@@ -62,6 +63,25 @@ export const storage = {
       return localStorage.getItem(STORAGE_KEYS.WATCHED_FILE);
     } catch (error) {
       console.warn('Failed to get watched file from localStorage:', error);
+      return null;
+    }
+  },
+
+  // Save watched directory path
+  saveWatchedDirectory: (directoryPath) => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.WATCHED_DIRECTORY, directoryPath);
+    } catch (error) {
+      console.warn('Failed to save watched directory to localStorage:', error);
+    }
+  },
+
+  // Get watched directory path
+  getWatchedDirectory: () => {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.WATCHED_DIRECTORY);
+    } catch (error) {
+      console.warn('Failed to get watched directory from localStorage:', error);
       return null;
     }
   },

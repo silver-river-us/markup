@@ -17,54 +17,49 @@ const FileWatcher = ({ onBack, isRestoring }) => {
   const lastModifiedRef = useRef(null);
 
   useEffect(() => {
+    // Clear any stale localStorage state that might cause permission errors
     if (isRestoring) {
-      const savedFile = storage.getWatchedFile();
-      if (savedFile) {
-        setSelectedFile(savedFile);
-        loadFile(savedFile);
-        startWatching(savedFile);
-        
-        // Scan directory for accessible files when restoring
-        const fileDir = savedFile.substring(0, savedFile.lastIndexOf('/'));
-        scanForMarkdownFiles(fileDir).then(foundFiles => {
-          setAccessibleFiles(foundFiles);
-          console.log('Restored accessible files:', Object.fromEntries(foundFiles));
-        }).catch(err => {
-          console.log('Could not scan directory on restore:', err);
-        });
-      }
+      console.log('Clearing localStorage state to prevent permission errors');
+      storage.clearState();
+      setError(null);
     }
   }, [isRestoring]);
 
-  const scanForMarkdownFiles = async (dirPath, baseDir = null) => {
+  const scanForMarkdownFiles = async (dirPath) => {
     const markdownFiles = new Map();
     
-    try {
-      const entries = await readDir(dirPath);
-      
-      for (const entry of entries) {
-        if (entry.isFile && entry.name.match(/\.(md|markdown|mdown|mkd|mdx)$/i)) {
-          const fullPath = `${dirPath}/${entry.name}`;
-          const relativePath = baseDir ? fullPath.replace(baseDir + '/', '') : entry.name;
-          console.log(`Found markdown file: ${entry.name} -> ${relativePath} (${fullPath})`);
-          markdownFiles.set(relativePath, fullPath);
-        } else if (entry.isDirectory) {
-          // Recursively scan subdirectories
-          const subDirPath = `${dirPath}/${entry.name}`;
-          try {
-            const subFiles = await scanForMarkdownFiles(subDirPath, baseDir || dirPath);
-            subFiles.forEach((fullPath, relativePath) => {
-              markdownFiles.set(relativePath, fullPath);
-            });
-          } catch (subDirError) {
-            console.log(`Cannot access subdirectory ${entry.name}:`, subDirError);
+    const scanDirectory = async (currentPath, relativePath = '') => {
+      try {
+        console.log(`Scanning directory: ${currentPath}`);
+        const entries = await readDir(currentPath);
+        
+        for (const entry of entries) {
+          // Skip hidden directories and common build/cache directories
+          if (entry.isDirectory && (entry.name.startsWith('.') || 
+              ['node_modules', 'dist', 'build', 'target', '.git'].includes(entry.name))) {
+            continue;
+          }
+          
+          if (entry.isFile && entry.name.match(/\.(md|markdown|mdown|mkd|mdx)$/i)) {
+            const fullPath = `${currentPath}/${entry.name}`;
+            const relativeKey = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+            console.log(`Found markdown file: ${relativeKey} -> ${fullPath}`);
+            markdownFiles.set(relativeKey, fullPath);
+          } else if (entry.isDirectory) {
+            // Recursively scan subdirectories
+            const subDirPath = `${currentPath}/${entry.name}`;
+            const subRelativePath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+            await scanDirectory(subDirPath, subRelativePath);
           }
         }
+      } catch (error) {
+        // Silently skip directories we can't access
+        console.log(`Cannot access directory: ${currentPath}`, error.message);
       }
-    } catch (error) {
-      console.error('Error scanning directory:', error);
-    }
+    };
     
+    await scanDirectory(dirPath);
+    console.log(`Found ${markdownFiles.size} total markdown files`);
     return markdownFiles;
   };
 
@@ -81,6 +76,7 @@ const FileWatcher = ({ onBack, isRestoring }) => {
 
       if (directory && directory !== null) {
         setSelectedDirectory(directory);
+        storage.saveWatchedDirectory(directory);
         
         // Scan directory for markdown files
         console.log('Scanning directory for markdown files:', directory);
@@ -147,6 +143,7 @@ const FileWatcher = ({ onBack, isRestoring }) => {
           const foundFiles = await scanForMarkdownFiles(fileDir);
           setAccessibleFiles(foundFiles);
           setSelectedDirectory(fileDir);
+          storage.saveWatchedDirectory(fileDir);
         } catch (scanError) {
           console.log('Could not scan directory, using single file mode:', scanError);
         }
@@ -166,8 +163,20 @@ const FileWatcher = ({ onBack, isRestoring }) => {
       setFileContent(content);
     } catch (err) {
       console.error('Load file error:', err);
-      setError(`Failed to read file: ${err?.message || 'Unknown error'}`);
-      setFileContent('');
+      
+      // If we get a forbidden path error, reset state and ask for reselection
+      if (err.message && err.message.includes('forbidden path')) {
+        setError('Lost access to file. Please select the directory again to restore permissions.');
+        setSelectedFile(null);
+        setSelectedDirectory(null);
+        setAccessibleFiles(new Map());
+        setFileContent('');
+        // Clear the invalid saved state
+        storage.clearState();
+      } else {
+        setError(`Failed to read file: ${err?.message || 'Unknown error'}`);
+        setFileContent('');
+      }
     }
   };
 
@@ -186,6 +195,17 @@ const FileWatcher = ({ onBack, isRestoring }) => {
       await loadFile(filePath);
     } catch (err) {
       console.error('Error checking file changes:', err);
+      
+      // If we get a forbidden path error, stop watching and ask user to reselect
+      if (err.message && err.message.includes('forbidden path')) {
+        setError('Lost access to file. Please select the directory again to restore permissions.');
+        stopWatching();
+        setSelectedFile(null);
+        setSelectedDirectory(null);
+        setAccessibleFiles(new Map());
+        // Clear the invalid saved state
+        storage.clearState();
+      }
     }
   };
 
